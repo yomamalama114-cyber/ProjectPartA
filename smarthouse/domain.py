@@ -7,22 +7,22 @@ from typing import Optional
 class Measurement:
     def __init__(self, timestamp: datetime, value: float, unit: str):
         self.timestamp = timestamp
-        self.value = value
+        self.value = float(value)
         self.unit = unit
 
 
 class Device:
-    def __init__(self, id: str, supplier: str, device_name: str, device_type: str):
+    def __init__(self, id: str, device_name: str, supplier: str, device_type: str):
         self.id = str(id)
-        self.supplier = str(supplier)
         self.device_name = str(device_name)
+        self.supplier = str(supplier)
         self.device_type = str(device_type)
-        self.room: Optional[Room] = None
-
-    def is_actuator(self) -> bool:
-        return False
+        self.room = None
 
     def is_sensor(self) -> bool:
+        return False
+
+    def is_actuator(self) -> bool:
         return False
 
     def get_device_type(self) -> str:
@@ -33,22 +33,22 @@ class Sensor(Device):
     def __init__(
         self,
         id: str,
+        device_name: str,
         supplier: str,
         device_type: str,
-        device_name: str,
         unit: Optional[str] = None
     ):
-        super().__init__(id, supplier, device_name, device_type)
+        super().__init__(id, device_name, supplier, device_type)
         self.unit = unit
         self.measurements: list[Measurement] = []
+
+    def is_sensor(self) -> bool:
+        return True
 
     def last_measurement(self) -> Optional[Measurement]:
         if not self.measurements:
             return None
         return self.measurements[-1]
-
-    def is_sensor(self) -> bool:
-        return True
 
     def get_measurements(self) -> list[Measurement]:
         return list(self.measurements)
@@ -83,8 +83,8 @@ class Sensor(Device):
 
 
 class Actuator(Device):
-    def __init__(self, id: str, supplier: str, device_name: str, device_type: str):
-        super().__init__(id, supplier, device_name, device_type)
+    def __init__(self, id: str, device_name: str, supplier: str, device_type: str):
+        super().__init__(id, device_name, supplier, device_type)
         self.active = False
         self.target_value: Optional[float] = None
 
@@ -114,13 +114,53 @@ class ActuatorWithSensor(Actuator):
     def __init__(
         self,
         id: str,
-        supplier: str,
         device_name: str,
+        supplier: str,
         device_type: str,
-        sensor: Sensor
+        unit: Optional[str] = None
     ):
-        super().__init__(id, supplier, device_name, device_type)
-        self.sensor = sensor
+        super().__init__(id, device_name, supplier, device_type)
+        self.unit = unit
+        self.measurements: list[Measurement] = []
+
+    def is_sensor(self) -> bool:
+        return True
+
+    def add_measurement(
+        self,
+        value: float,
+        unit: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> Measurement:
+        if unit is None:
+            if self.unit is None:
+                raise ValueError("Unit må oppgis første gangen")
+            unit = self.unit
+        else:
+            self.unit = unit
+
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        measurement = Measurement(timestamp, value, unit)
+        self.measurements.append(measurement)
+        return measurement
+
+    def last_measurement(self) -> Optional[Measurement]:
+        if not self.measurements:
+            return None
+        return self.measurements[-1]
+
+    def get_measurements(self) -> list[Measurement]:
+        return list(self.measurements)
+
+    def remove_current_measurement(self) -> Optional[Measurement]:
+        if not self.measurements:
+            return None
+        return self.measurements.pop()
+
+    def clear_measurements(self) -> None:
+        self.measurements.clear()
 
 
 class Room:
