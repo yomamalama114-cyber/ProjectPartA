@@ -227,7 +227,7 @@ class SmartHouse:
         room.add_device(device)
         return device
 
-    def get_device(self, device_id):
+    def get_devices(self, device_id):
         for room in self.get_rooms():
             for device in room.get_devices():
                 if device.id == str(device_id):
