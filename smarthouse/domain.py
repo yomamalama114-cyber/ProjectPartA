@@ -12,9 +12,9 @@ class Measurement:
 
 
 class Device:
-    def __init__(self, id: str, device_name: str, supplier: str, device_type: str):
+    def __init__(self, id: str, model_name: str, supplier: str, device_type: str):
         self.id = str(id)
-        self.device_name = str(device_name)
+        self.model_name = str(model_name)
         self.supplier = str(supplier)
         self.device_type = str(device_type)
         self.room = None
@@ -33,12 +33,12 @@ class Sensor(Device):
     def __init__(
         self,
         id: str,
-        device_name: str,
+        model_name: str,
         supplier: str,
         device_type: str,
         unit: Optional[str] = None
     ):
-        super().__init__(id, device_name, supplier, device_type)
+        super().__init__(id, model_name, supplier, device_type)
         self.unit = unit
         self.measurements: list[Measurement] = []
 
@@ -47,7 +47,7 @@ class Sensor(Device):
 
     def last_measurement(self) -> Optional[Measurement]:
         if not self.measurements:
-            return None
+            self.add_measurement(0.0)
         return self.measurements[-1]
 
     def get_measurements(self) -> list[Measurement]:
@@ -67,6 +67,7 @@ class Sensor(Device):
         unit: Optional[str] = None,
         timestamp: Optional[datetime] = None
     ) -> Measurement:
+
         if unit is None:
             if self.unit is None:
                 raise ValueError("Unit må oppgis første gangen")
@@ -79,12 +80,13 @@ class Sensor(Device):
 
         measurement = Measurement(timestamp, value, unit)
         self.measurements.append(measurement)
+
         return measurement
 
 
 class Actuator(Device):
-    def __init__(self, id: str, device_name: str, supplier: str, device_type: str):
-        super().__init__(id, device_name, supplier, device_type)
+    def __init__(self, id: str, model_name: str, supplier: str, device_type: str):
+        super().__init__(id, model_name, supplier, device_type)
         self.active = False
         self.target_value: Optional[float] = None
 
@@ -93,6 +95,7 @@ class Actuator(Device):
 
     def turn_on(self, target_value: Optional[float] = None) -> None:
         self.active = True
+
         if target_value is not None:
             self.target_value = float(target_value)
 
@@ -103,7 +106,12 @@ class Actuator(Device):
     def is_active(self) -> bool:
         return self.active
 
-    def set_state(self, active: bool, target_value: Optional[float] = None) -> None:
+    def set_state(
+        self,
+        active: bool,
+        target_value: Optional[float] = None
+    ) -> None:
+
         if active:
             self.turn_on(target_value)
         else:
@@ -114,12 +122,13 @@ class ActuatorWithSensor(Actuator):
     def __init__(
         self,
         id: str,
-        device_name: str,
+        model_name: str,
         supplier: str,
         device_type: str,
         unit: Optional[str] = None
     ):
-        super().__init__(id, device_name, supplier, device_type)
+        super().__init__(id, model_name, supplier, device_type)
+
         self.unit = unit
         self.measurements: list[Measurement] = []
 
@@ -132,6 +141,7 @@ class ActuatorWithSensor(Actuator):
         unit: Optional[str] = None,
         timestamp: Optional[datetime] = None
     ) -> Measurement:
+
         if unit is None:
             if self.unit is None:
                 raise ValueError("Unit må oppgis første gangen")
@@ -144,11 +154,12 @@ class ActuatorWithSensor(Actuator):
 
         measurement = Measurement(timestamp, value, unit)
         self.measurements.append(measurement)
+
         return measurement
 
     def last_measurement(self) -> Optional[Measurement]:
         if not self.measurements:
-            return None
+            self.add_measurement(0.0)
         return self.measurements[-1]
 
     def get_measurements(self) -> list[Measurement]:
@@ -164,15 +175,28 @@ class ActuatorWithSensor(Actuator):
 
 
 class Room:
-    def __init__(self, floor: Floor, room_size: float, room_name: Optional[str] = None):
+    def __init__(
+        self,
+        floor: "Floor",
+        room_size: float,
+        room_name: Optional[str] = None
+    ):
         self.floor = floor
         self.room_size = float(room_size)
         self.room_name = room_name
         self.devices: list[Device] = []
 
     def add_device(self, device: Device) -> None:
+
+        # Flytt device fra gammelt rom
+        if device.room is not None:
+            if device in device.room.devices:
+                device.room.devices.remove(device)
+
         device.room = self
-        self.devices.append(device)
+
+        if device not in self.devices:
+            self.devices.append(device)
 
     def get_devices(self) -> list[Device]:
         return list(self.devices)
@@ -199,13 +223,17 @@ class SmartHouse:
 
     def register_floor(self, level):
         floor = Floor(level)
+
         self.floors.append(floor)
         self.floors.sort(key=lambda f: f.level)
+
         return floor
 
     def register_room(self, floor, room_size, room_name=None):
         room = Room(floor, room_size, room_name)
+
         floor.add_room(room)
+
         return room
 
     def get_floors(self):
@@ -213,23 +241,36 @@ class SmartHouse:
 
     def get_rooms(self):
         rooms = []
+
         for floor in self.floors:
             rooms.extend(floor.get_rooms())
+
         return rooms
 
     def get_area(self):
         total = 0
+
         for room in self.get_rooms():
             total += room.get_area()
+
         return total
 
     def register_device(self, room, device):
         room.add_device(device)
         return device
 
-    def get_devices(self, device_id):
+    def get_devices(self):
+        devices = []
+
         for room in self.get_rooms():
-            for device in room.get_devices():
-                if device.id == str(device_id):
-                    return device
+            devices.extend(room.get_devices())
+
+        return devices
+
+    def get_device_by_id(self, device_id):
+
+        for device in self.get_devices():
+            if device.id == str(device_id):
+                return device
+
         return None
